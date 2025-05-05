@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Word Rain - Typing Game</title>
+  <link rel="icon" type="image/x-icon" href="icon.ico">
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #ffe4f2;
+      margin: 0;
+      overflow: hidden;
+      height: 100vh;
+    }
+
+    /* Game status display - positioned at top left */
+    #game-status {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 50;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 10px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(183, 11, 152, 0.2);
+    }
+
+    #game-status #score, #username-top,
+    #game-status #lives {
+      font-size: 18px;
+      font-weight: bold;
+      color: #880e4f;
+      margin: 5px 0;
+    }
+
+    /* Desktop Layout - Side by side */
+    @media (min-width: 769px) {
+      body {
+        display: flex;
+        flex-direction: row;
+      }
+
+      #game {
+        flex: 1;
+        position: relative;
+        background: #fff0f5;
+        overflow: hidden;
+      }
+
+      #sidebar {
+        width: 320px;
+        background: #f8bbd0;
+        padding: 20px;
+        box-shadow: -4px 0 12px rgba(183, 11, 152, 0.1);
+        text-align: center;
+        overflow-y: auto;
+        height: 100vh;
+        position: relative;
+      }
+
+      /* Hide mobile elements on desktop */
+      #burger-menu, #overlay, #game-controls, .mobile-only {
+        display: none;
+      }
+    }
+
+    /* Mobile Layout - Stacked with burger menu */
+    @media (max-width: 768px) {
+      body {
+        display: flex;
+        flex-direction: column;
+      }
+
+      #game {
+        flex: 1;
+        position: relative;
+        background: #fff0f5;
+        overflow: hidden;
+        padding-bottom: 120px;
+      }
+
+      #sidebar {
+        position: fixed;
+        top: 0;
+        right: -320px;
+        width: 280px;
+        height: 100vh;
+        background: #f8bbd0;
+        padding: 20px;
+        box-shadow: -4px 0 12px rgba(183, 11, 152, 0.1);
+        text-align: center;
+        overflow-y: auto;
+        transition: right 0.3s ease;
+        z-index: 999;
+      }
+
+      #sidebar.open {
+        right: 0;
+      }
+
+      /* Hide desktop elements on mobile */
+      #word-input, .desktop-only {
+        display: none;
+      }
+    }
+
+    /* Common Styles */
+    .input-container {
+      position: relative;
+      width: 100%;
+    }
+
+    .input-container input {
+      width: 100%;
+      padding: 12px 16px;
+      border-radius: 25px;
+      border: 2px solid #f8bbd0;
+      background-color: #ffffff;
+      font-size: 16px;
+      outline: none;
+      position: relative;
+      z-index: 2;
+      box-shadow: 0 4px 10px rgba(248, 187, 208, 0.4);
+      transition: all 0.3s ease;
+    }
+
+    .input-container input:focus {
+      border-color: #ec407a;
+      box-shadow: 0 6px 15px rgba(236, 64, 122, 0.3);
+    }
+
+    .hi-animation {
+      position: absolute;
+      top: 50%;
+      left: 30px;
+      transform: translate(-50%, 0%) scale(0.5);
+      opacity: 0;
+      font-size: 20px;
+      font-weight: bold;
+      color: #ec407a;
+      padding: 3px 18px;
+      border-radius: 20px;
+      z-index: 1;
+      transition: all 0.6s ease;
+      pointer-events: none;
+    }
+
+    .meow {
+      position: absolute;
+      top: 50%;
+      right: -40px;
+      transform: translate(-50%, 0%) scale(0.5);
+      opacity: 0;
+      font-size: 20px;
+      font-weight: bold;
+      color: #ec407a;
+      padding: 6px 12px;
+      border-radius: 20px;
+      z-index: 1;
+      transition: all 0.6s ease;
+      pointer-events: none;
+    }
+
+    .input-container input:focus ~ .hi-animation {
+      transform: translate(-50%, -120%) scale(1);
+      opacity: 1;
+    }
+
+    .input-container input:focus ~ .meow {
+      transform: translate(-50%, -120%) scale(1);
+      opacity: 1;
+    }
+
+    .word {
+      position: absolute;
+      font-size: 24px;
+      font-weight: bold;
+      color: #e91e63;
+      top: 0;
+      animation: fall linear forwards;
+      animation-duration: 6s;
+    }
+
+    .paused {
+      animation-play-state: paused !important;
+    }
+
+    @keyframes fall {
+      from {
+        top: 0;
+      }
+      to {
+        top: 100vh;
+      }
+    }
+
+    #username-display {
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 10px;
+      color: #6a1b9a;
+    }
+
+    #word-input {
+      padding: 12px;
+      font-size: 18px;
+      width: 100%;
+      border-radius: 8px;
+      border: 2px solid #e91e63;
+      outline: none;
+      margin-top: 10px;
+      margin-bottom: 5px;
+    }
+
+    .icon-btn {
+      margin-top: 10px;
+      padding: 10px;
+      background-color: #e91e63;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      font-size: 22px;
+      cursor: pointer;
+      width: 50px;
+      height: 50px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .icon-btn:hover {
+      background-color: #c2185b;
+    }
+
+    .icon-container {
+      margin-top: 20px;
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    #game-over {
+      position: absolute;
+      top: 40%;
+      width: 100%;
+      text-align: center;
+      font-size: 36px;
+      color: red;
+      font-weight: bold;
+      display: none;
+      z-index: 500;
+    }
+
+    .login-container {
+      margin-top: 20px;
+      text-align: left;
+    }
+
+    .login-container input {
+      width: 100%;
+      padding: 10px;
+      margin: 6px 0;
+      border: 2px solid #ce93d8;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+
+    .login-container button {
+      width: 49%;
+      padding: 10px;
+      margin-top: 8px;
+      background: #ab47bc;
+      color: white;
+      border: none;
+      font-size: 16px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .login-container button:hover {
+      background: #8e24aa;
+    }
+
+    #message {
+      margin-top: 10px;
+      font-weight: bold;
+      color: green;
+      text-align: center;
+    }
+
+    /* Mobile-specific styles */
+    .burger-icon {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      background: #e91e63;
+      color: white;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+
+    #game-controls {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: rgba(255, 228, 242, 0.95);
+      padding: 10px;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+      z-index: 100;
+    }
+
+    #mobile-game-controls {
+      display: flex;
+      justify-content: space-around;
+      margin-top: 10px;
+    }
+
+    .mobile-icon-btn {
+      background-color: #e91e63;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      font-size: 18px;
+      cursor: pointer;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .mobile-icon-btn:hover {
+      background-color: #c2185b;
+    }
+
+    #overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 998;
+      display: none;
+    }
+
+    @media (max-width: 480px) {
+      .word {
+        font-size: 18px;
+      }
+      
+      #sidebar {
+        width: 250px;
+      }
+      
+      #game-controls {
+        padding: 8px;
+      }
+      
+      #mobile-word-input {
+        padding: 10px 14px;
+      }
+      
+      #game-status {
+        padding: 8px;
+      }
+      
+      #game-status #score, 
+      #game-status #lives {
+        font-size: 16px;
+        margin: 3px 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="game">
+    <!-- New game status display at top left -->
+    <div id="game-status">
+      <div  id="username-top">Username: <span id="logged-user" style="color: #6a1b9a;">Guest</span></div>
+      <div id="score">Score: 0</div>
+      <div id="lives">Lives: 3 ❤️❤️❤️</div>
+    </div>
+    <div id="game-over">Game Over!</div>
+  </div>
+
+  <!-- Mobile-specific elements -->
+  <div class="burger-icon" id="burger-menu">
+    <i class="fa fa-bars fa-2x"></i>
+  </div>
+
+  <div id="overlay"></div>
+
+  <div id="game-controls" class="mobile-only">
+    <div class="input-container">
+      <input type="text" id="mobile-word-input" placeholder="Type here..." autocomplete="off" />
+      <div class="meow"><img src="p5.gif" alt="Meoww" style="width: 40px; height: auto;" /></div>
+      <div class="hi-animation"><img src="p4.gif" alt="Cute Poki GIF" style="width: 40px; height: auto;" /></div>
+    </div>
+    <div id="mobile-game-controls">
+      <button id="mobile-start-btn" class="mobile-icon-btn" title="Start"><i class="fa fa-play"></i></button>
+      <button id="mobile-pause-btn" class="mobile-icon-btn" title="Pause"><i class="fa fa-paw"></i></button>
+      <button id="mobile-stop-btn" class="mobile-icon-btn" title="Stop"><i class="fa fa-stop"></i></button>
+    </div>
+  </div>
+
+  <!-- Sidebar (for both desktop and mobile) -->
+  <div id="sidebar">
+    <div id="auth-section">
+      <h3 style="color: #6a1b9a;">Welcome <span id="logged-user1" style="color: #6a1b9a;">Guest</span></h3>
+      <div id="login-signup-form">
+        <p id="message" style="color: green;"></p>
+      </div>
+    </div>
+    <div id="user-high-score" style="margin-top: 10px; color: #880e4f; font-size: 20px; font-weight: bold; margin-bottom: 20px;"></div>
+    
+    <!-- Desktop input field -->
+    <div class="input-container desktop-only">
+      <input type="text" id="word-input" placeholder="Start typing..." autocomplete="off" />
+      <div class="meow"><img src="p5.gif" alt="Meoww" style="width: 50px; height: auto;" /></div>
+      <div class="hi-animation"><img src="p4.gif" alt="Cute Poki GIF" style="width: 50px; height: auto;" /></div>
+    </div>
+    
+    <div class="icon-container">
+      <button id="start-btn" class="icon-btn" title="Start"><i class="fa fa-play"></i></button>
+      <button id="pause-btn" class="icon-btn" title="Pause/Resume"><i class="fa fa-paw"></i></button>
+      <button id="stop-btn" class="icon-btn" title="Stop"><i class="fa fa-stop"></i></button>
+    </div>
+
+    <div class="login-container">
+      <div class="input-container">
+        <input type="text" id="username" placeholder="Username" />
+        <input type="password" id="password" placeholder="Password" />
+      </div>
+      
+      <div style="display: flex; justify-content: space-between;">
+        <button id="login-btn" onclick="login()">Login</button>
+        <button id="signup-btn" onclick="signup()">Signup</button>
+      </div>
+      <div id="message"></div>
+    </div>
+    <h4 style="margin-top: 40px; color: #150a6c;">🏆 Top 3 High Scores</h4>
+    <div id="top-scores" style="color: #a21129; font-weight: bold;"></div>
+  </div>
+
+  <script>
+    loadScores();
+    let words = [];
+
+    fetch('words.txt')
+      .then(response => response.text())
+      .then(text => {
+        words = text.split('\n').map(w => w.trim()).filter(Boolean);
+      })
+      .catch(err => {
+        console.error('Error loading words.txt:', err);
+        words = ["apple", "banana", "orange", "cat", "dog", "elephant", "giraffe", "typing", "game", "mobile", "word", "rain", "default"];
+      });
+
+    const game = document.getElementById("game");
+    const desktopInput = document.getElementById("word-input");
+    const mobileInput = document.getElementById("mobile-word-input");
+    const scoreDisplay = document.getElementById("score");
+    const livesDisplay = document.getElementById("lives");
+    const gameOverDisplay = document.getElementById("game-over");
+    const messageDisplay = document.getElementById("message");
+    const sidebar = document.getElementById("sidebar");
+    const burgerMenu = document.getElementById("burger-menu");
+    const overlay = document.getElementById("overlay");
+
+    const startBtn = document.getElementById("start-btn");
+    const pauseBtn = document.getElementById("pause-btn");
+    const stopBtn = document.getElementById("stop-btn");
+    const mobileStartBtn = document.getElementById("mobile-start-btn");
+    const mobilePauseBtn = document.getElementById("mobile-pause-btn");
+    const mobileStopBtn = document.getElementById("mobile-stop-btn");
+
+    let activeWords = [];
+    let score = 0;
+    let lives = 3;
+    let fallSpeed = 6;
+    let spawnInterval;
+    let gameRunning = false;
+    let gamePaused = false;
+    let loggedInUser = null;
+    let isMobile = window.innerWidth <= 768;
+
+    // Toggle sidebar for mobile
+    if (burgerMenu) {
+      burgerMenu.addEventListener("click", () => {
+        sidebar.classList.toggle("open");
+        overlay.style.display = sidebar.classList.contains("open") ? "block" : "none";
+      });
+    }
+
+    if (overlay) {
+      overlay.addEventListener("click", () => {
+        sidebar.classList.remove("open");
+        overlay.style.display = "none";
+      });
+    }
+
+    // Helper function to get the current active input based on device
+    function getActiveInput() {
+      return isMobile ? mobileInput : desktopInput;
+    }
+
+    function spawnWord() {
+      if (!gameRunning || gamePaused) return;
+
+      const wordText = words[Math.floor(Math.random() * words.length)];
+      const wordElem = document.createElement("div");
+      wordElem.classList.add("word");
+      wordElem.textContent = wordText;
+      
+      // Adjust position based on screen width to prevent words from spawning off-screen
+      const maxLeft = game.clientWidth - 100;
+      wordElem.style.left = Math.max(10, Math.min(maxLeft, Math.random() * maxLeft)) + "px";
+      
+      game.appendChild(wordElem);
+
+      const wordObj = {
+        text: wordText,
+        element: wordElem,
+        startTime: Date.now(),
+        timeout: null,
+        remainingTime: fallSpeed * 1000
+      };
+
+      wordObj.timeout = setTimeout(() => {
+        if (game.contains(wordElem)) {
+          game.removeChild(wordElem);
+          activeWords = activeWords.filter(w => w.element !== wordElem);
+          loseLife();
+        }
+      }, wordObj.remainingTime);
+      activeWords.push(wordObj);
+    }
+
+    function updateScore() {
+      scoreDisplay.textContent = `Score: ${score}`;
+    }
+
+    function updateLives() {
+      const hearts = "❤️".repeat(lives);
+      livesDisplay.textContent = `Lives: ${lives} ${hearts}`;
+    }
+
+    function loseLife() {
+      if (!gameRunning || gamePaused) return;
+      lives--;
+      updateLives();
+      if (lives <= 0) endGame();
+    }
+
+    
+    function saveScore(score, username = 'guest') {
+        const formData = new URLSearchParams();
+        formData.append('score', score);
+        formData.append('username', username); // Will override session if needed
+
+        fetch('save_log.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: formData.toString()
+        })
+        .then(response => response.text())
+        .then(data => {
+            console.log(data); // Optional: show success message
+        })
+        .catch(error => {
+            console.error('Error saving score:', error);
+        });
+    }
+
+
+
+
+    function endGame() {
+      gameRunning = false;
+      clearInterval(spawnInterval);
+      gameOverDisplay.style.display = "block";
+      const input = getActiveInput();
+      if (input) input.disabled = true;
+
+      if (loggedInUser) {
+        fetch('save_score.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: `username=${encodeURIComponent(loggedInUser)}&score=${score}`
+        }).then(() => loadScores());
+      }
+
+      let currentUser = "guest";
+      if(loggedInUser){
+        currentUser = loggedInUser;
+      }
+      saveScore(score, currentUser);
+    }
+
+    function loadScores() {
+      fetch('get_scores.php')
+        .then(res => res.json())
+        .then(data => {
+          console.log("Top Scores:", data.topScores); 
+          const top = data.topScores.map(
+            (u, i) => `${i + 1}. ${u.username}: ${u.high_score}` 
+          ).join("<br>");
+          document.getElementById("top-scores").innerHTML = top;
+
+          if (data.userHighScore && loggedInUser) {
+            const userHighScoreElem = document.getElementById("user-high-score");
+            userHighScoreElem.innerText = `Your High Score: ${data.userHighScore}`;
+            userHighScoreElem.style.display = "block";
+          }
+        })
+        .catch(err => {
+          console.error("Error loading scores:", err);
+          document.getElementById("top-scores").innerHTML = "Unable to load scores";
+        });
+    }
+
+    function resetGame() {
+      clearInterval(spawnInterval);
+      activeWords.forEach(w => {
+        clearTimeout(w.timeout);
+        w.element.remove();
+      });
+      activeWords = [];
+
+      score = 0;
+      lives = 3;
+      gameRunning = true;
+      gamePaused = false;
+
+      const input = getActiveInput();
+      if (input) {
+        input.disabled = false;
+        input.value = "";
+        input.focus();
+      }
+
+      gameOverDisplay.style.display = "none";
+      updateScore();
+      updateLives();
+
+      // Adjust spawn interval based on device width
+      const spawnRate = isMobile ? 2500 : 2000;
+      spawnInterval = setInterval(spawnWord, spawnRate);
+    }
+
+    function togglePause() {
+      if (!gameRunning) return;
+
+      gamePaused = !gamePaused;
+
+      activeWords.forEach(word => {
+        if (gamePaused) {
+          word.element.classList.add("paused");
+          const elapsed = Date.now() - word.startTime;
+          word.remainingTime -= elapsed;
+          clearTimeout(word.timeout);
+        } 
+        else {
+          word.element.classList.remove("paused");
+          word.startTime = Date.now();
+          word.timeout = setTimeout(() => {
+            if (game.contains(word.element)) {
+              game.removeChild(word.element);
+              activeWords = activeWords.filter(w => w.element !== word.element);
+              loseLife();
+            }
+          }, word.remainingTime);
+        }
+      });
+    }
+
+    function stopGame() {
+      gameRunning = false;
+      gamePaused = false;
+      clearInterval(spawnInterval);
+      activeWords.forEach(w => {
+        clearTimeout(w.timeout);
+        w.element.remove();
+      });
+      activeWords = [];
+      
+      const input = getActiveInput();
+      if (input) input.disabled = true;
+      
+      gameOverDisplay.style.display = "none";
+      score = 0;
+      lives = 3;
+      updateScore();
+      updateLives();
+    }
+
+    // Event handlers for desktop input
+    if (desktopInput) {
+      desktopInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && gameRunning && !gamePaused) {
+          const typed = desktopInput.value.trim();
+          const matchIndex = activeWords.findIndex(w => w.text === typed);
+          if (matchIndex !== -1) {
+            clearTimeout(activeWords[matchIndex].timeout);
+            game.removeChild(activeWords[matchIndex].element);
+            activeWords.splice(matchIndex, 1);
+            score++;
+            updateScore();
+          }
+          desktopInput.value = "";
+        }
+      });
+    }
+
+    // Event handlers for mobile input
+    if (mobileInput) {
+      mobileInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && gameRunning && !gamePaused) {
+          const typed = mobileInput.value.trim();
+          const matchIndex = activeWords.findIndex(w => w.text === typed);
+          if (matchIndex !== -1) {
+            clearTimeout(activeWords[matchIndex].timeout);
+            game.removeChild(activeWords[matchIndex].element);
+            activeWords.splice(matchIndex, 1);
+            score++;
+            updateScore();
+          }
+          mobileInput.value = "";
+        }
+      });
+    }
+
+    // Bind desktop buttons
+    startBtn.addEventListener("click", () => {
+      if (!gameRunning) {
+        resetGame();
+      } 
+      else if (gamePaused) {
+        togglePause();
+      }
+    });
+    pauseBtn.addEventListener("click", togglePause);
+    stopBtn.addEventListener("click", stopGame);
+
+    // Bind mobile buttons if they exist
+    if (mobileStartBtn) {
+      mobileStartBtn.addEventListener("click", () => {
+        if (!gameRunning) {
+          resetGame();
+        } 
+        else if (gamePaused) {
+          togglePause();
+        }
+      });
+    }
+    if (mobilePauseBtn) mobilePauseBtn.addEventListener("click", togglePause);
+    if (mobileStopBtn) mobileStopBtn.addEventListener("click", stopGame);
+
+    function login() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+
+      fetch('login.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
+      })
+      .then(res => res.text())
+      .then(data => {
+        if (data === "success") {
+          loggedInUser = username;
+          document.getElementById("logged-user").innerText = username;
+          document.getElementById("logged-user1").innerText = username;
+          const messageElem = document.getElementById("message");
+          messageElem.textContent = "Successfully Logged In!";
+          document.getElementById("username").value = "";
+          document.getElementById("password").value = "";
+          gameOverDisplay.style.display = "none";
+          score = 0;
+          lives = 3;
+          updateScore();
+          updateLives();
+          setTimeout(() => {
+            messageElem.textContent = "";
+            // Close sidebar on mobile after successful login
+            if (isMobile) {
+              sidebar.classList.remove("open");
+              overlay.style.display = "none";
+            }
+          }, 3000);
+        } 
+        else {
+          alert(data);
+        }
+      });
+    }
+
+    function signup() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      fetch('signup.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `username=${username}&password=${password}`
+      })
+      .then(res => res.text())
+      .then(data => {
+        if (data === "success") {
+          loggedInUser = username;
+          document.getElementById("logged-user").innerText = username;
+          document.getElementById("message").textContent = "Successfully Signed Up!";
+          document.getElementById("username").value = "";
+          document.getElementById("password").value = "";
+          gameOverDisplay.style.display = "none";
+          score = 0;
+          lives = 3;
+          updateScore();
+          updateLives();
+          setTimeout(() => {
+            document.getElementById("message").textContent = "";
+            // Close sidebar on mobile after successful signup
+            if (isMobile) {
+              sidebar.classList.remove("open");
+              overlay.style.display = "none";
+            }
+          }, 3000);
+        } 
+        else {
+          alert(data);
+        }
+      });
+    }
+
+    // Check device and update layout variables
+    function checkDevice() {
+      isMobile = window.innerWidth <= 768;
+      
+      // Update active words positions if needed
+      activeWords.forEach(word => {
+        const maxLeft = game.clientWidth - 100;
+        if (parseInt(word.element.style.left) > maxLeft) {
+          word.element.style.left = maxLeft + "px";
+        }
+      });
+    }
+
+    // Check device on resize
+    window.addEventListener('resize', checkDevice);
+
+    // Initialize device check
+    checkDevice();
+
+    // Auto-focus input on mobile
+    if (isMobile) {
+      document.addEventListener('click', function() {
+        if (gameRunning && !gamePaused && mobileInput) {
+          mobileInput.focus();
+        }
+      });
+    }
+  </script>
+</body>
+</html>

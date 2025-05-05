@@ -1,0 +1,6 @@
+CREATE TABLE user_game_sessions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL,
+    score INT NOT NULL,
+    game_time DATETIME DEFAULT CURRENT_TIMESTAMP
+);
